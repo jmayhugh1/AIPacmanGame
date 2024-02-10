@@ -19,6 +19,9 @@ Pacman agents (in search_agents.py).
 
 from builtins import object
 import util
+STATE = 0
+ACTION = 1
+COST = 2
 
 def tiny_maze_search(problem):
     """
@@ -60,51 +63,48 @@ def depth_first_search(problem):
     #     ]
     # 
     #Example:
-    final_directions = []
-    start_state = problem.get_start_state()
-    print(start_state)
-    transitions = problem.get_successors(start_state)
-    visited = set()#util.PriorityQueue()
-    stack = util.Stack()
-    x,y, move =  start_state[0], start_state[1], []
-    stack.push((x,y,move))
-    print(len(stack.list))
-    priority = 0
-    while not stack.is_empty():
-        priority += 1
-        print("starting dfs")
-        x,y, prev = stack.pop()
-        visited.add((x,y))
-        print(visited)
-        if problem.is_goal_state((x,y)):
-            print(prev)
-            print("this is the goal")
-            final_directions = prev
-            break
-        else:
-            transitions = problem.get_successors((x,y))
-            for transition in transitions:
-                print(transitions)
-                x,y = transition[0]
-                direction = transition[1]
-                
-                if (x,y) not in visited:
-                    stack.push((x,y,prev + [direction]))
+    ##use priority PriorityQueue to take lowest cost
+    from game import Directions
+    s = Directions.SOUTH
+    w = Directions.WEST
+    n = Directions.NORTH
+    e = Directions.EAST
+    # start_state = problem.get_start_state() #state, rev
+    # # if problem.is_goal_state(start_state):
+    # #     return [start_state]
+    # frontier = util.Stack()
+    # frontier.push((start_state, []))
+    # explored = set()
+    # explored.add(start_state)
+    # while not frontier.is_empty():
+    #     node = frontier.pop()
+    #     if problem.is_goal_state(node[STATE]):
+    #         return node[ACTION]
         
-    formatted_return = []
-    for direction in final_directions:
-        if direction == "West":
-            formatted_return.append(w)
-        elif direction == "North":
-            formatted_return.append(n)
-        elif direction == "East":
-            formatted_return.append(e)
-        elif direction == "South":
-            formatted_return.append(s)
-
+    #     for child in problem.get_successors(node[STATE]):
+    #         if child[STATE] not in explored:
+    #             explored.add(child[STATE])
+    #             frontier.push((child[STATE],node[ACTION] + [child[ACTION]]))
+                
+    #             print((child[STATE],node[ACTION] + [child[ACTION]]))
 
     # print(transitions)
-    return formatted_return
+    stack = util.Stack()
+    visited = set()
+    if problem.is_goal_state(problem.get_start_state()):
+        return []
+    stack.push((problem.get_start_state(),[]))
+    while not stack.is_empty():
+        position, path = stack.pop()
+        visited.add(position)
+        if problem.is_goal_state(position):
+            return path
+        for node in problem.get_successors(position):
+            newposition = node[0]
+            state = node[1]
+            if newposition not in visited:
+                stack.push((newposition, path + [state]))
+    
     
     util.raise_not_defined()
 
@@ -112,13 +112,57 @@ def depth_first_search(problem):
 def breadth_first_search(problem):
     """Search the shallowest nodes in the search tree first."""
     "*** YOUR CODE HERE ***"
-    util.raise_not_defined()
+    from game import Directions
+    s = Directions.SOUTH
+    w = Directions.WEST
+    n = Directions.NORTH
+    e = Directions.EAST
+    start_state = problem.get_start_state() #state, rev
+    if problem.is_goal_state(start_state):
+        return [start_state]
+    frontier = util.Queue()
+    frontier.push((start_state, []))
+    explored = set()
+    explored.add(start_state)
+    while not frontier.is_empty():
+        node = frontier.pop()
+        if problem.is_goal_state(node[STATE]):
+            return node[ACTION]
+        
+        for child in problem.get_successors(node[STATE]):
+            if child[STATE] not in explored:
+                explored.add(child[STATE])
+                frontier.push((child[STATE],node[ACTION] + [child[ACTION]]))
+       
 
 
 def uniform_cost_search(problem, heuristic=None):
     """Search the node of least total cost first."""
     "*** YOUR CODE HERE ***"
+    from game import Directions
+    s = Directions.SOUTH
+    w = Directions.WEST
+    n = Directions.NORTH
+    e = Directions.EAST
+    start_state = problem.get_start_state() #state, rev
+    if problem.is_goal_state(start_state):
+        return [start_state]
+    frontier = util.PriorityQueue()
+    frontier.push((start_state, []), 0)
+    explored = {}
+    explored[start_state] = (0, []) #(cost, path)
+    while not frontier.is_empty():
+        node = frontier.pop()
+        if problem.is_goal_state(node[STATE]):
+            return node[ACTION]
+       
+        for child in problem.get_successors(node[STATE]):
+            newcost = explored[node[STATE]][0] + child[COST] # get the cost to the current node plus the child cost to get path to that node
+            if child[STATE] not in explored or newcost < explored[child[STATE]][0]:
+                explored[child[STATE]] = (newcost, node[ACTION] + [child[ACTION]])
+                frontier.update((child[STATE],node[ACTION] + [child[ACTION]]), newcost)
     util.raise_not_defined()
+    
 
 
 def null_heuristic(state, problem=None):
@@ -128,12 +172,7 @@ def null_heuristic(state, problem=None):
     """
     return 0
 
-
-def a_star_search(problem, heuristic=null_heuristic):
-    """Search the node that has the lowest combined cost and heuristic first."""
-    "*** YOUR CODE HERE ***"
-    
-    # What does this function need to return?
+# What does this function need to return?
     #     list of actions that reaches the goal
     # 
     # What data is available?
@@ -157,9 +196,37 @@ def a_star_search(problem, heuristic=null_heuristic):
     #     start_state = problem.get_start_state()
     #     transitions = problem.get_successors(start_state)
     #     return [  transitions[0].action  ]
+def a_star_search(problem, heuristic=null_heuristic):
+    """Search the node that has the lowest combined cost and heuristic first."""
+    "*** YOUR CODE HERE ***"
+    ## the heuerstic shoud only be used to determine which is next in priorirty
+    ## only add the actual path to the oath cost 
+    start_state = problem.get_start_state() #state, rev
+    if problem.is_goal_state(start_state):
+        return [start_state]
+    frontier = util.PriorityQueue()
+    frontier.push(start_state, heuristic(start_state, problem)) # state, cost
+    explored = {}
+    explored[start_state] = (heuristic(start_state, problem), [])  # state -> cost
+    while not frontier.is_empty():
+        node = frontier.pop()
+        currentstate = node
+        currentpathcost, currentpath = explored[currentstate][0], explored[currentstate][1]
+        
+        if problem.is_goal_state(currentstate):
+            return currentpath
+       
+        for child in problem.get_successors(currentstate):
+            childstate, childaction, childcost = child[0], child[1], child[2]
+            newpathcost = currentpathcost + childcost ##+ heuristic(childstate, problem)
+            if childstate not in explored or newpathcost < explored[childstate][0]: 
+                # explored[childstate][0] should be the current tracked cost
+                explored[childstate] = (newpathcost, currentpath + [childaction])
+                frontier.update(childstate, newpathcost + heuristic(childstate, problem))
+            
+            
     
     util.raise_not_defined()
-
 
 # (you can ignore this, although it might be helpful to know about)
 # This is effectively an abstract class

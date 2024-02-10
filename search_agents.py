@@ -322,10 +322,13 @@ class CornersProblem(search.SearchProblem):
     You must select a suitable state space and successor function
     """
 
-    def __init__(self, starting_game_state):
+    def __init__(self, starting_game_state, cost_fn = lambda x : 1):
         """
         Stores the walls, pacman's starting position and corners.
         """
+        STATE = 0
+        ACTION = 1
+        # use bfs
         self.walls = starting_game_state.get_walls()
         self.starting_position = starting_game_state.get_pacman_position()
         top, right = self.walls.height - 2, self.walls.width - 2
@@ -340,24 +343,67 @@ class CornersProblem(search.SearchProblem):
         #     self.debugging = True
         #     self.total_iterations = 0
         "*** YOUR CODE HERE ***"
+        
+        
+        
+        
+        
+        ##BFS
+        # if self.is_goal_state(start_state):
+        #     corners_visited.add(start_state)
+        # frontier = util.Queue()
+        # frontier.push((start_state, []))
+        # explored = set()
+        # explored.add(start_state)
+        # while not frontier.is_empty():
+        #     node = frontier.pop()
+        #     if self.is_goal_state(node[STATE]) and node[STATE] not in corners_visited:
+        #         corners_visited.add(node[STATE])
+        #         if len(corners_visited) == 4:
+        #             return node[ACTION]
+        #         frontier = util.Queue()
+        #         frontier.push((node[STATE],node[ACTION]))
+        #         explored = set()
+                                
+        #     for child in self.get_successors(node[STATE]):
+        #         if child[STATE] not in explored:
+        #             explored.add(child[STATE])
+        #             frontier.push((child[STATE],node[ACTION] + [child[ACTION]]))
+        
 
     def get_start_state(self):
         """
         Returns the start state (in your state space, not the full Pacman state space)
         """
         "*** YOUR CODE HERE ***"
+        return (self.starting_position, ())
         util.raise_not_defined()
 
     def is_goal_state(self, state):
         """
-        Returns whether this search state is a goal state of the problem.
+        Returns whether this search state is a goal state of theself. 
         """
         "*** YOUR CODE HERE ***"
-        util.raise_not_defined()
+        return set(state[1]) == set(self.corners)
+        
 
     def get_successors(self, state):
-        
+        import tools
         "*** YOUR CODE HERE ***"
+        successors = []
+        for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+            x,y = state[0]
+            dx, dy = Actions.direction_to_vector(action)
+            NextSpotX, NextSpotY = int(x + dx), int(y + dy)
+            if not self.walls[NextSpotX][NextSpotY]:
+                next_state = (NextSpotX, NextSpotY)
+                cost = 1
+                corners_seen = list(state[1])
+                if (NextSpotX, NextSpotY) in self.corners and (NextSpotX, NextSpotY) not in state[1]:
+                    corners_seen.append(next_state)
+                successors.append((((next_state, tuple(corners_seen)), action, cost)) )  
+                
+                
         # What should this return?
         #     A list of Transitions, with a structure like this:
         #     [
@@ -415,6 +461,8 @@ class CornersProblem(search.SearchProblem):
 
 
 def corners_heuristic(state, problem):
+    def manhattan_heuristic(currentstate, endstate):
+        return abs(currentstate[0] - endstate[0]) + abs(currentstate[1] - endstate[1])
     """
     A heuristic for the CornersProblem that you defined.
 
@@ -431,7 +479,62 @@ def corners_heuristic(state, problem):
     walls = problem.walls  # These are the walls of the maze, as a Grid (game.py)
 
     "*** YOUR CODE HERE ***"
-    return 0  # Default to trivial solution
+    #get distance to closest heuristic
+    distancelist = {}
+    remaining_corners = set(corners) - set(state[1])
+    if len(remaining_corners) == 0:
+        return 0
+    total_distance = 0
+    current_position = state[0]
+
+    while remaining_corners:
+        closest_corner = None
+        closest_distance = float('inf')
+
+        # Iterate over each remaining corner to find the closest one
+        for corner in remaining_corners:
+            distance = manhattan_heuristic(current_position, corner)
+
+            # If this corner is closer than the previously found corners, update closest_corner and closest_distance
+            if distance < closest_distance:
+                closest_corner = corner
+                closest_distance = distance
+
+        # Update the total distance with the distance to the closest corner found in this iteration
+        total_distance += closest_distance
+
+        # Update the current position to be the closest corner found in this iteration
+        current_position = closest_corner
+
+        # Remove the closest corner from the set of remaining corners, as it has now been visited
+        remaining_corners.remove(closest_corner)
+
+    return total_distance
+
+
+    #find closest corner to the current state
+    #find distance to closest
+    # totaldist = 0
+    # currentstate = state[0]
+    # for i in range(len(remaining_corners)):
+    #     m_corner = None
+    #     m_dist = -1
+    #     #check remaining corners and find distance
+    #     for corner in remaining_corners:
+    #         x,y = currentstate, corner
+    #         distance = manhattan_heuristic(x,y)
+    #         if m_corner == None or m_dist >= distance:
+    #             m_corner = corner
+    #             m_dist = distance
+    #     remaining_corners = remaining_corners - set(m_corner) # remove the selected corner
+    #     totaldist += distance ## add minimum distance
+    #     currentstate = m_corner # set the new starting point for the next one
+    # return totaldist
+                
+            
+    
+      
+    return max(distancelist)  # Default to trivial solution
 
 
 class AStarCornersAgent(SearchAgent):
@@ -545,8 +648,15 @@ def food_heuristic(state, problem):
     problem.heuristic_info['wall_count']
     """
     position, food_grid = state
-    "*** YOUR CODE HERE ***"
-    return 0
+    food_list = food_grid.as_list()
+    if problem.is_goal_state(state):
+        return 0
+    dists = []
+    for item in food_list:
+        dists_to_food = maze_distance(position,item,problem.starting_game_state) #you can use starting_game_state becasue it is current pacman state is not impotant
+        dists.append(dists_to_food)
+    return max(dists)
+   
 
 
 class ClosestDotSearchAgent(SearchAgent):
@@ -584,6 +694,7 @@ class ClosestDotSearchAgent(SearchAgent):
         problem = AnyFoodSearchProblem(game_state)
 
         "*** YOUR CODE HERE ***"
+        return search.bfs(problem)
         util.raise_not_defined()
 
 
@@ -621,6 +732,7 @@ class AnyFoodSearchProblem(PositionSearchProblem):
         x, y = state
 
         "*** YOUR CODE HERE ***"
+        return state in self.food.as_list()
         util.raise_not_defined()
 
 
